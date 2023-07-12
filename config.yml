@@ -1,0 +1,77 @@
+version: 2.1
+
+jobs:
+  build:
+    environment:
+      DEVICE: r5x
+      OEM: realme
+      MANIFEST: https://github.com/PixysOS/manifest
+      DT_LINK: https://github.com/eartinity/device_realme_r5x
+      DT_PATH: device/$OEM/$DEVICE
+      DT_BRANCH: -b pixys #include if any, else leave empty as usual
+      KT_LINK: https://github.com/eartinity/kernel_realme_r5x
+      KT_PATH: kernel/$OEM/$DEVICE
+      KT_BRANCH: -b inline/dynamic #include if any, else leave empty as usual
+      VT_LINK: https://github.com/eartinity/vendor_realme_r5x
+      VT_PATH: vendor/$OEM/$DEVICE
+      VT_BRANCH: #include if any, else leave empty as usual
+      TARGET: bacon
+      LUNCH_COMBO: pixys_${DEVICE}-userdebug
+      OUTPUT: PixysOS*.zip
+
+    executor:
+      name: "ubuntu/22.04"
+      cpu: 8
+      memory: 32GB
+
+    steps:
+      - run:
+          name: Clone source and trees script
+          command: |
+            echo "============================"
+            echo "Starting sync....."
+            echo "============================"
+            mkdir -p ~/work
+            cd ~/work
+            repo init --depth=1 -u $MANIFEST
+            repo sync 
+            git clone $DT_LINK $DT_BRANCH $DT_PATH
+            git clone $KT_LINK $KT_BRANCH $KT_PATH
+            git clone $VT_LINK $VT_PATH
+            echo "============================"
+            echo "Syncing Complete!"
+            echo "============================"
+
+      - run:
+          name: Build script
+          command: |
+            echo "============================"
+            echo "Starting the Build..."
+            echo "============================"
+            cd ~/work
+            export USE_CCACHE=1
+            export CCACHE_EXEC=/usr/bin/ccache
+            ccache -M 50G
+            . build/envsetup.sh
+            lunch $LUNCH_COMBO
+            mka $TARGET
+
+      - run:
+          name: Upload script
+          command: |
+            echo "============================"
+            echo "Uploading the Build..."
+            echo "============================"
+            cd ~/work
+            cd out/target/product/"$DEVICE"
+            ls -lh
+            pwd
+            chmod 777 *
+            curl --upload-file $(echo $OUTPUT) https://transfer.sh | tee link.txt && echo " "
+            echo " "
+            echo "============================"
+            echo "Build Uploaded!"
+            echo "Please see the link Below-  "
+            echo "----------------------------"
+            cat link.txt && echo " "
+            echo "============================"
